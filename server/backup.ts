@@ -1,0 +1,10 @@
+import { backup } from "node:sqlite";
+import { mkdirSync, chmodSync } from "node:fs";
+import { openDatabase } from "./db";
+const db = openDatabase(process.env.DATABASE_PATH ?? ".data/uru.sqlite");
+mkdirSync(".data/backups", { recursive: true, mode: 0o700 });
+const path = `.data/backups/uru-${new Date().toISOString().replace(/[:.]/g, "-")}.sqlite`;
+await backup(db, path);
+chmodSync(path, 0o600);
+db.close();
+console.log(path);

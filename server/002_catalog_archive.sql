@@ -1,0 +1,4 @@
+BEGIN IMMEDIATE;
+ALTER TABLE catalog ADD COLUMN archived INTEGER NOT NULL DEFAULT 0 CHECK(archived IN (0,1));
+INSERT INTO schema_migrations(version) VALUES(2);
+COMMIT;
