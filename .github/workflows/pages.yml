@@ -12,6 +12,8 @@ concurrency:
   cancel-in-progress: false
 jobs:
   build:
+    outputs:
+      pages_mode: ${{ steps.pages-mode.outputs.mode }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -30,7 +32,19 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist-pages
+      - name: Detect the repository's Pages publishing mode
+        id: pages-mode
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mode="$(gh api "repos/${GITHUB_REPOSITORY}/pages" --jq '.build_type')"
+          echo "mode=${mode}" >> "$GITHUB_OUTPUT"
+          if [ "$mode" != "workflow" ]; then
+            echo "Pages uses its existing branch source. Build and tests passed; Actions deployment is intentionally skipped. Publish the built demo through the configured gh-pages branch." >> "$GITHUB_STEP_SUMMARY"
+          fi
   deploy:
+    if: needs.build.outputs.pages_mode == 'workflow'
     needs: build
     environment:
       name: github-pages

@@ -13,7 +13,7 @@ The Node/SQLite application remains available with `npm run dev` / `npm start`. 
 
 ## Automatic deployment
 
-`.github/workflows/pages.yml` runs on pushes to `main` and on manual dispatch. It installs Node 24, runs the server/schema tests, builds the Pages variant, uploads only `dist-pages`, and deploys through the official Pages actions. The workflow's deploy job requests only Pages write and OIDC permissions, with read-only source access.
+`.github/workflows/pages.yml` runs on pushes to `main` and on manual dispatch. It installs Node 24, runs the server/schema tests, builds the Pages variant, uploads only `dist-pages`, and deploys through the official Pages actions. The workflow's deploy job requests only Pages write and OIDC permissions, with read-only source access. It reads the configured publishing mode: with a branch source it verifies the build and explicitly skips the Actions deployment instead of attempting an incompatible deployment. Branch-source publishing still requires updating the configured artifact branch.
 
 GitHub repository **Settings → Pages → Build and deployment → Source** must be **GitHub Actions**. This setting requires repository administration. The default workflow token cannot enable Pages for a new repository, as documented by `actions/configure-pages` input `enablement`; an authorized GitHub API connection or repository owner must enable it first. The workflow never requests or embeds a personal token.
 
