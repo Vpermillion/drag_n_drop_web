@@ -1,0 +1,23 @@
+{
+  "index.html": {
+    "file": "assets/index-B8vQN0A2.js",
+    "name": "index",
+    "src": "index.html",
+    "isEntry": true,
+    "dynamicImports": [
+      "src/pages/demo-api.ts"
+    ],
+    "css": [
+      "assets/index-BZO-V4vt.css"
+    ]
+  },
+  "src/pages/demo-api.ts": {
+    "file": "assets/demo-api-BjKNUpx-.js",
+    "name": "demo-api",
+    "src": "src/pages/demo-api.ts",
+    "isDynamicEntry": true,
+    "imports": [
+      "index.html"
+    ]
+  }
+}
