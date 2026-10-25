@@ -154,7 +154,7 @@ try {
     await studio
       .getByLabel("Tailwind classes")
       .fill(
-        "p-8 rounded-2xl bg-violet-50 hover:shadow-xl transition duration-300",
+        "p-8 rounded-2xl bg-violet-50 hover:shadow-xl transition duration-300 md:p-12",
       );
     await studio.getByRole("button", { name: "Apply Tailwind" }).click();
     await studio.getByRole("button", { name: "CSS", exact: true }).click();
@@ -174,6 +174,20 @@ try {
       .getByRole("button", { name: "Эхлэх бүтэц", exact: false })
       .click();
     await studio.locator(".starter-card").last().click();
+    await page
+      .getByRole("button", { name: "Mobile layout", exact: true })
+      .click();
+    assert.equal(
+      await page
+        .locator(".canvas-page .node-collection .node-container")
+        .first()
+        .evaluate((el) => getComputedStyle(el).padding),
+      "32px",
+      "Mobile canvas does not inherit desktop Tailwind media rules",
+    );
+    await page
+      .getByRole("button", { name: "Desktop layout", exact: true })
+      .click();
     await page.getByRole("button", { name: "Нийтлэх", exact: false }).click();
     await page.getByRole("status").filter({ hasText: "Нийтлэгдлээ" }).waitFor();
     const slug = (await page
@@ -191,7 +205,7 @@ try {
       animation: getComputedStyle(el).animationName,
       transition: getComputedStyle(el).transitionDuration,
     }));
-    assert.equal(style.padding, "32px");
+    assert.equal(style.padding, "48px");
     assert.equal(style.borderRadius, "30px");
     assert.equal(style.animation, "none");
     assert.equal(style.transition, "0s");

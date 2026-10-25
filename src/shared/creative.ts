@@ -29,11 +29,11 @@ export function validateUtilities(input: string) {
         `Unsupported Tailwind utility: ${token}. Choose a suggested class or use scoped CSS.`,
     );
 }
-export function utilityClasses(input = "") {
+export function utilityClasses(input = "", mobilePreview = false) {
   return input
     .trim()
     .split(/\s+/)
-    .filter((t) => supported.has(t))
+    .filter((t) => supported.has(t) && (!mobilePreview || !/^(sm|md):/.test(t)))
     .map((t) => "tw:" + t)
     .join(" ");
 }

@@ -777,6 +777,7 @@ export default function Editor({
                   <PageRenderer
                     site={{ ...site, document: doc }}
                     editing
+                    mobilePreview={mobile}
                     onText={(id, text) =>
                       update((d) => {
                         findNode(d, id)!.props.text = text;

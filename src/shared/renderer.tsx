@@ -86,11 +86,13 @@ export function pageCSS(site: SiteData) {
 export function PageRenderer({
   site,
   editing = false,
+  mobilePreview = false,
   wrap,
   onText,
 }: {
   site: SiteData;
   editing?: boolean;
+  mobilePreview?: boolean;
   wrap?: (node: PageNode, content: ReactNode, scope?: RecordData) => ReactNode;
   onText?: (id: string, text: string) => void;
 }) {
@@ -277,7 +279,7 @@ export function PageRenderer({
           {render(c, record, inForm || n.type === "form")}
         </React.Fragment>
       ));
-    const className = `page-node pn-${n.id} node-${n.type} ${utilityClasses(n.props.utilities)}`;
+    const className = `page-node pn-${n.id} node-${n.type} ${utilityClasses(n.props.utilities, editing && mobilePreview)}`;
     let content: ReactNode;
     switch (n.type) {
       case "container":

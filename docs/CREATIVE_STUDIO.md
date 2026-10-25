@@ -18,7 +18,7 @@ p-8 rounded-2xl bg-violet-50 hover:shadow-xl md:p-12
 
 Rendering prefixes them with `tw:` so they do not conflict with the dashboard's styles. Supported spacing, layout, typography, palette, borders, radii, shadows and transitions are compiled ahead of time, including `sm:`, `md:`, `hover:` and `focus-visible:` variants. Unsupported classes and arbitrary bracket/URL values produce validation errors; this is a curated Tailwind library, not runtime compilation of every possible Tailwind expression. Extend the manifest to add more compiled utilities.
 
-Tailwind utilities override the visual sliders. Explicit scoped CSS has final priority. Both the editor and published runtime use the same styles.
+Tailwind utilities override the visual sliders. Explicit scoped CSS has final priority. Both the editor and published runtime use the same styles. The 360px editor preview excludes desktop-only `sm:`/`md:` utilities even when the owner uses a wide monitor; published pages use the actual browser breakpoints.
 
 ## Scoped CSS
 
