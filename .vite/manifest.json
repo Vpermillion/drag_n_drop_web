@@ -1,23 +1,42 @@
 {
+  "_css-engine-DbHpBLsd.js": {
+    "file": "assets/css-engine-DbHpBLsd.js",
+    "name": "css-engine"
+  },
   "index.html": {
-    "file": "assets/index-B8vQN0A2.js",
+    "file": "assets/index-Cvg4CVtQ.js",
     "name": "index",
     "src": "index.html",
     "isEntry": true,
+    "imports": [
+      "_css-engine-DbHpBLsd.js"
+    ],
     "dynamicImports": [
-      "src/pages/demo-api.ts"
+      "src/pages/demo-api.ts",
+      "src/creative/CreativeStudio.tsx"
     ],
     "css": [
-      "assets/index-BZO-V4vt.css"
+      "assets/index-D5ZYt1-H.css"
+    ]
+  },
+  "src/creative/CreativeStudio.tsx": {
+    "file": "assets/CreativeStudio-By_m52En.js",
+    "name": "CreativeStudio",
+    "src": "src/creative/CreativeStudio.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "index.html",
+      "_css-engine-DbHpBLsd.js"
     ]
   },
   "src/pages/demo-api.ts": {
-    "file": "assets/demo-api-BjKNUpx-.js",
+    "file": "assets/demo-api-ylk-2Ayb.js",
     "name": "demo-api",
     "src": "src/pages/demo-api.ts",
     "isDynamicEntry": true,
     "imports": [
-      "index.html"
+      "index.html",
+      "_css-engine-DbHpBLsd.js"
     ]
   }
 }
