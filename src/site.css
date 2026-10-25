@@ -281,3 +281,52 @@ p {
     animation: none !important;
   }
 }
+
+@keyframes uru-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes uru-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+@keyframes uru-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.78;
+  }
+}
+.editing-site .page-node {
+  animation: none !important;
+}
+.creative-embed {
+  width: 100%;
+  min-height: 160px;
+  max-width: 100%;
+  border: 0;
+  color-scheme: light;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Beat utility !important values and generated element-specific declarations. */
+  html body .published-site .page-node,
+  html body .creative-studio .studio-sample {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}

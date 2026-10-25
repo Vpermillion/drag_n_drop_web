@@ -9,8 +9,10 @@ The default Cloudflare stack in the specification was a suggested starting point
 ## Modules
 
 - `src/shared/schema.ts`: schema v1, fixed action vocabulary, safe style values, stable IDs, traversal, cloning, moves, semantic validation and version gate.
-- `src/shared/renderer.tsx`: the registry for all eight primitives, explicit repeater record scope, responsive CSS, local interaction state, cart and visitor forms. Used by editor, SSR and client hydration.
+- `src/shared/renderer.tsx`: the registry for the eight original primitives plus an isolated creative-code widget, explicit repeater record scope, responsive CSS, local interaction state, cart and visitor forms. Used by editor, SSR and client hydration.
 - `src/shared/seeds.ts`: three original compositions with different structures and visual identities; no private users, credentials or fictitious live results.
+- `src/creative/`: Creative Studio, editable starters and isolated widget rendering; see CREATIVE_STUDIO.md.
+- `src/shared/creative.ts`: parsed/scoped CSS, supported utility validation and sandbox document generation.
 - `src/Editor.tsx`: dnd-kit pointer/keyboard sensors, click insertion, accessible layers and move controls, history, inspector, scoped bindings, preview/publishing.
 - `server/app.ts`: authenticated API, permissions and typed business services. Browser workspace selectors select context; every private operation checks session membership independently.
 - `server/db.ts` and numbered SQL files: relational records, forward migrations, `BEGIN IMMEDIATE` transactions, public record projections and expiry.
@@ -36,7 +38,7 @@ Interactions run in a defined order, optionally gated by a simple field equality
 | inquiry                | Form submission; typed `name`, `contact`, optional `message`, `projectType`, `teamSize`                                         |
 | booking                | Form submission; typed `name`, `contact`, `date`, `time`; service from scope/explicit ID                                        |
 
-Inquiry/booking inputs must use the listed field keys. The editor explains these names. An inquiry for `projectType=Оффис` requires `teamSize`. Unknown server parameters are rejected. Booking times are the four synthetic slots exposed by the Nami composition, in Ulaanbaatar time. No arbitrary form endpoints, SQL or JavaScript are accepted.
+Inquiry/booking inputs must use the listed field keys. The editor explains these names. An inquiry for `projectType=Оффис` requires `teamSize`. Unknown server parameters are rejected. Booking times are the four synthetic slots exposed by the Nami composition, in Ulaanbaatar time. No arbitrary form endpoints, SQL or JavaScript business actions are accepted. Explicit owner-created JavaScript is confined to the separate sandboxed creative widget; it is never evaluated in the trusted host runtime.
 
 Document history concerns editing only. It cannot undo or replay business calls. Saved reusable compositions are scoped to the workspace in browser storage, get fresh node IDs on insertion, and strip explicit record IDs; they do not contain a cart, session, customer record or other mutable runtime state. A composition with record bindings must be placed inside a suitable collection or corrected before saving. Cross-device composition libraries and multi-page navigation are future work; each current site has one editable page.
 

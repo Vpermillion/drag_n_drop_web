@@ -35,3 +35,9 @@ Complete any failing local checks first. Then obtain current official provider d
 ## GitHub Pages variant
 
 A separate, explicitly labeled browser demo is implemented for the repository subpath. `npm run build:pages` and `npm run test:pages` passed: editor persistence/publication, inquiry/order/booking, synthetic social replies and promotion retries, responsive assets and isolated browser state. The Node build and all 18 server/schema tests also pass after the shared path/transport changes. No Node API or SQLite data is included in the Pages artifact. Deployment requires GitHub Pages enablement; actual remote publication must be checked separately. See DEPLOYMENT.md.
+
+## Creative Studio expansion
+
+The editor now includes four original visual looks and four editable starting compositions, compiled Tailwind CSS utilities, scoped CSS declarations, reduced-motion-aware effects and an isolated HTML/CSS/JS widget with counter/mood/accordion examples. Existing document storage, business bindings and publication paths are preserved. The Pages adapter remains device-local. See CREATIVE_STUDIO.md for supported capabilities, restrictions and verification commands.
+
+Creative verification: all **24** unit/integration tests passed. The new creative browser suite passed in both Pages and server modes, including actual iframe pointer interactions, CSS/Tailwind precedence, reduced motion, preserved product actions, parent/cookie isolation and CSP-blocked networking. Four new Studio accessibility scans (desktop/mobile in both modes) reported zero violations. The original Pages and server browser suites also passed after these changes. Creative screenshots were inspected; code and studio controls remain responsive at 360px.

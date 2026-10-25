@@ -1,6 +1,14 @@
+import { createCodeNode } from "./creative/compositions";
 import { previewHref, siteHref } from "./paths";
 import { apiFetch } from "./transport";
-import React, { useEffect, useRef, useState, type ReactNode } from "react";
+import React, {
+  lazy,
+  Suspense,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import {
   DndContext,
   PointerSensor,
@@ -28,6 +36,7 @@ import {
   type Styles,
   type Action,
 } from "./shared/schema";
+const CreativeStudio = lazy(() => import("./creative/CreativeStudio"));
 const names: Record<string, string> = {
   container: "Контейнер",
   text: "Текст",
@@ -37,6 +46,7 @@ const names: Record<string, string> = {
   form: "Форм",
   collection: "Цуглуулга",
   conditional: "Нөхцөл",
+  embed: "HTML / JS",
 };
 const icons: Record<string, string> = {
   container: "▣",
@@ -47,8 +57,10 @@ const icons: Record<string, string> = {
   form: "☷",
   collection: "▦",
   conditional: "◇",
+  embed: "</>",
 };
 function primitive(type: PageNode["type"]): PageNode {
+  if (type === "embed") return createCodeNode();
   return {
     id: crypto.randomUUID(),
     type,
@@ -233,6 +245,10 @@ export default function Editor({
   >(null);
   const [doc, setDoc] = useState<PageDocument | null>(null);
   const [selected, setSelected] = useState("");
+  const [creativeOpen, setCreativeOpen] = useState(
+    new URLSearchParams(location.search).get("studio") === "1",
+  );
+  const [creativeTab, setCreativeTab] = useState("looks");
   const [leftTab, setLeftTab] = useState("library");
   const [rightTab, setRightTab] = useState("design");
   const [mobile, setMobile] = useState(false);
@@ -319,6 +335,23 @@ export default function Editor({
           ? target
           : findNode(d, parent()?.id ?? d.root.id)!;
       dest.children.push(newNode);
+    });
+    setSelected(newNode.id);
+    if (type === "embed") {
+      setCreativeTab("code");
+      setCreativeOpen(true);
+    }
+  }
+  function insertComposition(newNode: PageNode) {
+    if (!doc) return;
+    update((d) => {
+      const target = findNode(d, selected);
+      const destination =
+        target &&
+        ["container", "form", "collection", "conditional"].includes(target.type)
+          ? target
+          : findNode(d, parent()?.id ?? d.root.id)!;
+      destination.children.push(newNode);
     });
     setSelected(newNode.id);
   }
@@ -486,6 +519,25 @@ export default function Editor({
   const style = mobile ? { ...node?.style, ...node?.mobile } : node?.style;
   return (
     <div className="editor-shell">
+      {creativeOpen && node && (
+        <Suspense
+          fallback={
+            <div className="loading creative-loading" role="status">
+              Opening creative studio…
+            </div>
+          }
+        >
+          <CreativeStudio
+            key={selected + creativeTab}
+            initialTab={creativeTab}
+            node={node}
+            en={en}
+            onChange={(fn) => update((d) => fn(findNode(d, selected)!))}
+            onInsert={insertComposition}
+            onClose={() => setCreativeOpen(false)}
+          />
+        </Suspense>
+      )}
       <header className="editor-top">
         <button
           className="icon-btn"
@@ -523,6 +575,16 @@ export default function Editor({
             ▯
           </button>
         </div>
+        <button
+          className="creative-launch"
+          aria-label="Open creative studio"
+          onClick={() => {
+            setCreativeTab("looks");
+            setCreativeOpen(true);
+          }}
+        >
+          <span>✳</span> {en ? "Creative studio" : "Бүтээлч студи"} <i>↗</i>
+        </button>
         <div className="editor-actions">
           <button
             className="icon-btn"
@@ -605,6 +667,29 @@ export default function Editor({
                   <h3>Энгийнээс эхэл.</h3>
                   <p>Сонгосон хэсэгт нэмэх эсвэл хуудсанд чирж байрлуул.</p>
                 </div>
+                <button
+                  className="builder-welcome"
+                  aria-label="Explore creative starters"
+                  onClick={() => {
+                    setCreativeTab("pieces");
+                    setCreativeOpen(true);
+                  }}
+                >
+                  <span className="welcome-spark">✦</span>
+                  <strong>
+                    {en
+                      ? "An idea is a lovely start."
+                      : "Сайхан санаанаас эхэл."}
+                  </strong>
+                  <small>
+                    {en
+                      ? "Try a starter. Make it yours."
+                      : "Эхлэх бүтцээ сонгоод өөрийн болго."}
+                  </small>
+                  <span className="welcome-link">
+                    {en ? "Find a little inspiration" : "Урам авах санаанууд"} ↗
+                  </span>
+                </button>
                 <div className="block-library">
                   {primitives.map((type) => (
                     <LibraryItem
@@ -767,6 +852,21 @@ export default function Editor({
                     }
                   />
                 </label>
+                <button
+                  className="inspector-creative"
+                  onClick={() => {
+                    setCreativeTab(node.type === "embed" ? "code" : "looks");
+                    setCreativeOpen(true);
+                  }}
+                >
+                  ✳{" "}
+                  {node.type === "embed"
+                    ? "Edit HTML / CSS / JS"
+                    : en
+                      ? "Styles, Tailwind & CSS"
+                      : "Загвар, Tailwind ба CSS"}{" "}
+                  ↗
+                </button>
                 {rightTab === "design" ? (
                   <>
                     <div className="inspector-section-title">

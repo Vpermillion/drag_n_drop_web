@@ -73,6 +73,19 @@ async function serveSite(
   res.set("Cache-Control", preview ? "private,no-store" : "no-cache");
   res.type("html").send(html);
 }
+// Serve a privilege-free loader with its own CSP; do not loosen the app's CSP.
+app.get("/creative-sandbox", (_req, res) => {
+  res.set("Cache-Control", "no-store");
+  res.set(
+    "Content-Security-Policy",
+    "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src data:; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'; sandbox allow-scripts",
+  );
+  res
+    .type("html")
+    .send(
+      `<!doctype html><html><head><meta charset="utf-8"><title>Isolated creative widget</title></head><body><script>window.addEventListener('message',function(event){if(event.source!==parent||event.data?.type!=='uru:creative-document'||typeof event.data.document!=='string'||event.data.document.length>80000)return;document.open();document.write(event.data.document);document.close();});</script></body></html>`,
+    );
+});
 app.get("/s/:slug", (req, res) => serveSite(req, res));
 app.get("/preview/:site", (req, res) => serveSite(req, res, true));
 app.get("/", async (req, res, next) => {

@@ -1,3 +1,4 @@
+import { parseScopedCSS, validateUtilities } from "./creative";
 import { z } from "zod";
 export const primitives = [
   "container",
@@ -8,6 +9,7 @@ export const primitives = [
   "form",
   "collection",
   "conditional",
+  "embed",
 ] as const;
 const color = z
   .string()
@@ -75,6 +77,42 @@ export type Action = z.infer<typeof actionSchema>;
 const propsSchema = z
   .object({
     text: z.string().max(4000).optional(),
+    utilities: z
+      .string()
+      .max(2000)
+      .refine((value) => validateUtilities(value).length === 0, {
+        error:
+          "Unsupported Tailwind classes. Use the supported utility library.",
+      })
+      .optional(),
+    customCSS: z
+      .string()
+      .max(6000)
+      .refine((value) => parseScopedCSS(value).errors.length === 0, {
+        error:
+          "Invalid scoped CSS. Remove selectors, URLs, @rules or unsupported declarations.",
+      })
+      .optional(),
+    appearance: z
+      .object({
+        gradient: z
+          .enum(["none", "aurora", "mint", "sunset", "midnight"])
+          .optional(),
+        shadow: z.enum(["none", "soft", "lift", "glow"]).optional(),
+        motion: z.enum(["none", "reveal", "float", "pulse"]).optional(),
+        hover: z.enum(["none", "lift", "glow", "tilt"]).optional(),
+        duration: z.number().min(400).max(6000).optional(),
+      })
+      .strict()
+      .optional(),
+    code: z
+      .object({
+        html: z.string().max(16000),
+        css: z.string().max(12000),
+        js: z.string().max(12000),
+      })
+      .strict()
+      .optional(),
     src: z
       .string()
       .regex(/^(\/art\/[-\w.]+\.svg|\/api\/media\/[-\w.]+)$/)
@@ -215,6 +253,14 @@ export function validateDocument(input: unknown): string[] {
       errors.push(`${n.name}: this primitive cannot contain children.`);
     if (n.type === "collection" && !n.props.collection)
       errors.push(`${n.name}: choose a collection.`);
+    if (n.props.code && n.type !== "embed")
+      errors.push(`${n.name}: code belongs in an isolated embed element.`);
+    if (n.type === "embed" && !n.props.code)
+      errors.push(`${n.name}: add an HTML/CSS/JavaScript snippet.`);
+    if (n.type === "embed" && (n.props.actions?.length || n.props.binding))
+      errors.push(
+        `${n.name}: an isolated code widget cannot access business actions or bindings.`,
+      );
     const binding = n.props.binding;
     if (binding) {
       if (
@@ -307,7 +353,22 @@ export function moveNode(
 }
 export function cloneNode(node: PageNode): PageNode {
   const n = structuredClone(node);
-  walk(n, (c) => (c.id = crypto.randomUUID()));
+  const ids = new Map<string, string>();
+  walk(n, (c) => {
+    const old = c.id;
+    c.id = crypto.randomUUID();
+    ids.set(old, c.id);
+  });
+  walk(n, (c) => {
+    for (const action of c.props.actions ?? []) {
+      if (action.target && ids.has(action.target))
+        action.target = ids.get(action.target)!;
+      if (action.when && ids.has(action.when.field))
+        action.when.field = ids.get(action.when.field)!;
+    }
+    if (c.props.condition && ids.has(c.props.condition.field))
+      c.props.condition.field = ids.get(c.props.condition.field)!;
+  });
   return n;
 }
 export const money = (n: number) =>

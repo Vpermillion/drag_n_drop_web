@@ -1,0 +1,4 @@
+/* Prefix utilities to keep the application UI independent. No preflight reset. */
+@import "tailwindcss/theme.css" prefix(tw);
+@import "tailwindcss/utilities.css" important;
+@source "./shared/utility-tokens.json";

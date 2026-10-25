@@ -1,3 +1,10 @@
+import SandboxWidget from "../creative/SandboxWidget";
+import {
+  utilityClasses,
+  parseScopedCSS,
+  appearanceGradients,
+  appearanceShadows,
+} from "./creative";
 import { apiFetch } from "../transport";
 import { assetUrl, localHref, isPages } from "../paths";
 import React, {
@@ -50,7 +57,22 @@ function declarations(s: Styles) {
 export function pageCSS(site: SiteData) {
   let css = "";
   walk(site.document.root, (n) => {
-    css += `.pn-${n.id}{${declarations(n.style)}}`;
+    const appearance = n.props.appearance;
+    const extras = appearance
+      ? `${appearance.gradient && appearanceGradients[appearance.gradient] ? `background:${appearanceGradients[appearance.gradient]};` : ""}${appearance.shadow && appearanceShadows[appearance.shadow] ? `box-shadow:${appearanceShadows[appearance.shadow]};` : ""}${appearance.motion && appearance.motion !== "none" ? `animation:uru-${appearance.motion} ${appearance.duration ?? (appearance.motion === "reveal" ? 800 : 2800)}ms ease-in-out ${appearance.motion === "reveal" ? "both" : "infinite"};` : ""}`
+      : "";
+    css += `.pn-${n.id}{${declarations(n.style)};${extras}}`;
+    if (appearance?.hover && appearance.hover !== "none") {
+      const effect = {
+        lift: "transform:translateY(-5px)",
+        glow: "box-shadow:0 12px 38px #a185df45",
+        tilt: "transform:rotate(-1deg) translateY(-3px)",
+      }[appearance.hover];
+      css += `.pn-${n.id}{transition:transform 220ms ease,box-shadow 220ms ease}.pn-${n.id}:hover,.pn-${n.id}:focus-visible{${effect}}`;
+    }
+    const custom = parseScopedCSS(n.props.customCSS ?? "");
+    if (!custom.errors.length && custom.css)
+      css += `.published-site .pn-${n.id}{${custom.css}}`;
     const fallback: Styles = {
       ...(n.style.columns && n.style.columns > 1 ? { columns: 1 } : {}),
       ...(n.style.fontSize && n.style.fontSize > 44 ? { fontSize: 40 } : {}),
@@ -148,6 +170,10 @@ export function PageRenderer({
     );
     setNotice("Сагсанд нэмэгдлээ · " + record.name);
   }
+  const stateKey = (key: string, record?: RecordData) =>
+    record ? record.id + ":" + key : key;
+  const stateValue = (key: string, record?: RecordData) =>
+    state[stateKey(key, record)] ?? state[key];
   async function action(
     actions: Action[] | undefined,
     record?: RecordData,
@@ -155,7 +181,8 @@ export function PageRenderer({
   ) {
     try {
       for (const a of actions ?? []) {
-        if (a.when && state[a.when.field] !== a.when.equals) continue;
+        if (a.when && stateValue(a.when.field, record) !== a.when.equals)
+          continue;
         const selected = a.recordId
           ? site.records.find((r) => r.id === a.recordId)
           : record;
@@ -172,14 +199,27 @@ export function PageRenderer({
             if (["cart", "product"].includes(a.target ?? "cart")) {
               setProduct(selected ?? null);
               setPanel(a.target ?? "cart");
-            } else setState((s) => ({ ...s, [a.target!]: "open" }));
+            } else
+              setState((s) => ({
+                ...s,
+                [stateKey(a.target!, record)]: "open",
+              }));
             break;
           case "closePanel":
             if (["cart", "product"].includes(a.target ?? "cart"))
               setPanel(null);
-            else setState((s) => ({ ...s, [a.target!]: "closed" }));
+            else
+              setState((s) => ({
+                ...s,
+                [stateKey(a.target!, record)]: "closed",
+              }));
             break;
           case "setState":
+            setState((s) => ({
+              ...s,
+              [stateKey(a.target!, record)]: a.value ?? "",
+            }));
+            break;
           case "filter":
             setState((s) => ({ ...s, [a.target!]: a.value ?? "" }));
             break;
@@ -205,6 +245,12 @@ export function PageRenderer({
               `ТУРШИЛТ · ${a.type === "inquiry" ? "Хүсэлт хүлээн авлаа" : "Цаг захиалагдлаа"} · ${result.id.slice(0, 8)}`,
             );
             form.reset();
+            setState((previous) => {
+              const next = { ...previous };
+              for (const field of Object.keys(data))
+                next[stateKey(field, record)] = "";
+              return next;
+            });
             break;
           }
         }
@@ -231,7 +277,7 @@ export function PageRenderer({
           {render(c, record, inForm || n.type === "form")}
         </React.Fragment>
       ));
-    const className = `page-node pn-${n.id} node-${n.type}`;
+    const className = `page-node pn-${n.id} node-${n.type} ${utilityClasses(n.props.utilities)}`;
     let content: ReactNode;
     switch (n.type) {
       case "container":
@@ -261,6 +307,16 @@ export function PageRenderer({
         );
         break;
       }
+      case "embed":
+        content = (
+          <SandboxWidget
+            code={p.code ?? { html: "", css: "", js: "" }}
+            title={p.alt ?? n.name}
+            className={className + " creative-embed"}
+            editing={editing}
+          />
+        );
+        break;
       case "image":
         content = (
           <img
@@ -311,7 +367,11 @@ export function PageRenderer({
             e: React.ChangeEvent<
               HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
             >,
-          ) => setState((s) => ({ ...s, [p.name ?? n.id]: e.target.value })),
+          ) =>
+            setState((s) => ({
+              ...s,
+              [stateKey(p.name ?? n.id, record)]: e.target.value,
+            })),
         };
         content = (
           <label className={className} htmlFor={id}>
@@ -397,7 +457,7 @@ export function PageRenderer({
         content =
           editing ||
           !p.condition ||
-          state[p.condition.field] === p.condition.equals ? (
+          stateValue(p.condition.field, record) === p.condition.equals ? (
             <div className={className}>
               {editing && (
                 <small className="condition-label">

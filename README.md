@@ -36,9 +36,13 @@ npm start
 
 Production mode serves the built frontend and server-rendered published pages. It is still a **single-host Node pilot**, not a deployed SaaS or Cloudflare Worker. Use persistent storage and HTTPS before hosting it. Production cookies default to `Secure`; `COOKIE_SECURE=false` is only for local HTTP testing.
 
+## Creative Studio
+
+Select an element, then open **✳ Бүтээлч студи / Creative studio** for four visual looks, four editable starting compositions, gradients/shadows, motion/hover effects, compiled Tailwind utilities and scoped CSS. The HTML / JS tab previews and inserts an isolated interactive widget; code cannot access parent business data or checkout. See [Creative Studio](docs/CREATIVE_STUDIO.md) for supported CSS/Tailwind capabilities and the sandbox boundary.
+
 ## Editor
 
-Insert or drag containers, text, images, buttons, inputs, forms, collections and conditional views. Select elements on the canvas or in layers. Nest/move using drag handles or the destination selector; reorder with the arrow controls. The resize handle changes width. Duplicate/delete, undo/redo, direct text editing, reusable compositions, binding scope, mobile overrides, style controls, preview, save, publication history and rollback are implemented. `Ctrl/Cmd+S` saves; `Ctrl/Cmd+Z` and `Ctrl/Cmd+Shift+Z` undo/redo editor changes only.
+Insert or drag containers, text, images, buttons, inputs, forms, collections, conditional views and isolated HTML / JS widgets. Select elements on the canvas or in layers. Nest/move using drag handles or the destination selector; reorder with the arrow controls. The resize handle changes width. Duplicate/delete, undo/redo, direct text editing, reusable compositions, binding scope, mobile overrides, style controls, preview, save, publication history and rollback are implemented. `Ctrl/Cmd+S` saves; `Ctrl/Cmd+Z` and `Ctrl/Cmd+Shift+Z` undo/redo editor changes only.
 
 A collection explicitly defines the current record. A product button continues to use that record when its layout changes inside the collection. Invalid scope, cycle, unsafe navigation and deleted record references produce validation errors. Form action fields are a defined contract, not arbitrary server code; see [architecture](docs/ARCHITECTURE.md).
 
@@ -50,6 +54,7 @@ Drafts persist in SQLite with optimistic concurrency checks. Publish creates an 
 npm test
 npm run build
 npm run test:browser
+npm run test:creative
 ```
 
 Browser tests require Chromium (`/usr/bin/chromium` by default; set `CHROMIUM_PATH` for a different installation). The test starts/stops its own production server with a temporary SQLite database and uses real UI actions. Screenshots go to ignored `artifacts/`. It does not modify your development database or connect to external providers.

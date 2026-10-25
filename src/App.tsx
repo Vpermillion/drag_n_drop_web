@@ -309,9 +309,13 @@ export default function App() {
       return null;
     }
   }
-  function openEditor(id: string) {
+  function openEditor(id: string, creative = false) {
     setEditing(id);
-    history.replaceState(null, "", editorHref(id));
+    history.replaceState(
+      null,
+      "",
+      editorHref(id) + (creative ? "&studio=1" : ""),
+    );
   }
   const nav = (v: string) => {
     setView(v);
@@ -635,7 +639,9 @@ export default function App() {
                               "Build the website you imagine from a few simple elements.",
                             )}
                           </p>
-                          <button onClick={() => openEditor(data.sites[0]?.id)}>
+                          <button
+                            onClick={() => openEditor(data.sites[0]?.id, true)}
+                          >
                             {t("Бүтээж эхлэх", "Start creating")} <span>↗</span>
                           </button>
                         </div>

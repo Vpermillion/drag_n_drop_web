@@ -1,3 +1,4 @@
+import "./tailwind.css";
 import React from "react";
 import { hydrateRoot } from "react-dom/client";
 import { PageRenderer } from "./shared/renderer";
