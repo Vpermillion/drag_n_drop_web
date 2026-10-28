@@ -4,7 +4,7 @@
     "name": "css-engine"
   },
   "index.html": {
-    "file": "assets/index-BUbunX4n.js",
+    "file": "assets/index-_8saeRM_.js",
     "name": "index",
     "src": "index.html",
     "isEntry": true,
@@ -16,11 +16,11 @@
       "src/creative/CreativeStudio.tsx"
     ],
     "css": [
-      "assets/index-D5ZYt1-H.css"
+      "assets/index-ZTzKBj7m.css"
     ]
   },
   "src/creative/CreativeStudio.tsx": {
-    "file": "assets/CreativeStudio-CjIFR08b.js",
+    "file": "assets/CreativeStudio-BHi63ozu.js",
     "name": "CreativeStudio",
     "src": "src/creative/CreativeStudio.tsx",
     "isDynamicEntry": true,
@@ -30,7 +30,7 @@
     ]
   },
   "src/pages/demo-api.ts": {
-    "file": "assets/demo-api-nXOugbSs.js",
+    "file": "assets/demo-api-BlU02hqd.js",
     "name": "demo-api",
     "src": "src/pages/demo-api.ts",
     "isDynamicEntry": true,
