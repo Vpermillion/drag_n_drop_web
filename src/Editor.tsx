@@ -1,3 +1,14 @@
+import Explorer from "./editor/Explorer";
+import { geometryUtilityClasses } from "./shared/creative";
+import {
+  canContain,
+  nodePath,
+  insertAt,
+  moveRelative,
+  groupNode,
+  uniqueName,
+  type Placement,
+} from "./shared/workspace";
 import { createCodeNode } from "./creative/compositions";
 import { previewHref, siteHref } from "./paths";
 import { apiFetch } from "./transport";
@@ -17,6 +28,7 @@ import {
   useSensors,
   useDraggable,
   useDroppable,
+  useDndContext,
   pointerWithin,
   rectIntersection,
   type DragEndEvent,
@@ -108,7 +120,9 @@ function primitive(type: PageNode["type"]): PageNode {
 function LibraryItem({
   type,
   insert,
+  compact = false,
 }: {
+  compact?: boolean;
   type: PageNode["type"];
   insert: () => void;
 }) {
@@ -121,8 +135,10 @@ function LibraryItem({
       ref={setNodeRef}
       {...attributes}
       {...listeners}
-      className="library-item"
+      className={compact ? "ribbon-insert" : "library-item"}
       onClick={insert}
+      aria-label={compact ? `Insert ${type}` : undefined}
+      title={names[type]}
       style={
         transform
           ? {
@@ -137,6 +153,30 @@ function LibraryItem({
     </button>
   );
 }
+function CanvasDrop({
+  node,
+  placement,
+}: {
+  node: PageNode;
+  placement: Placement;
+}) {
+  const { active } = useDndContext();
+  const { setNodeRef, isOver } = useDroppable({
+    id: `canvas-${placement}-${node.id}`,
+    data: { nodeId: node.id, placement },
+  });
+  return (
+    <div
+      ref={setNodeRef}
+      data-canvas-drop={placement}
+      className={`canvas-drop canvas-drop-${placement} ${active ? "is-drag-active" : ""} ${isOver ? "is-over" : ""}`}
+    >
+      <span>
+        {placement === "before" ? "↑ Above / Дээр" : "↓ Below / Доор"}
+      </span>
+    </div>
+  );
+}
 function CanvasNode({
   node,
   selected,
@@ -144,6 +184,10 @@ function CanvasNode({
   children,
   scope,
   resize,
+  reposition,
+  style,
+  root,
+  mobilePreview,
 }: {
   node: PageNode;
   selected: boolean;
@@ -151,6 +195,10 @@ function CanvasNode({
   children: ReactNode;
   scope?: string;
   resize: (width: number) => void;
+  reposition: (left: number, top: number) => void;
+  style: Styles;
+  root: boolean;
+  mobilePreview: boolean;
 }) {
   const isContainer = [
     "container",
@@ -176,21 +224,78 @@ function CanvasNode({
         dragRef(el);
         dropRef(el);
       }}
-      className={`canvas-node ${selected ? "selected" : ""} ${isOver ? "drop-over" : ""} ${isDragging ? "dragging" : ""}`}
+      className={`canvas-node ${geometryUtilityClasses(node.props.utilities, mobilePreview)} ${selected ? "selected" : ""} ${isOver ? "drop-over" : ""} ${isDragging ? "dragging" : ""}`}
       data-node-id={node.id}
       onClick={(e) => {
         e.stopPropagation();
         select();
       }}
     >
+      {!root && <CanvasDrop node={node} placement="before" />}
       <div className="node-content">{children}</div>
+      {!root && <CanvasDrop node={node} placement="after" />}
       {selected && (
         <>
           <div className="node-tag">
             <button {...listeners} {...attributes} aria-label="Элемент чирэх">
               ⠿
             </button>
-            <span>{names[node.type]}</span>
+            <span>{node.name}</span>
+            {style.position === "absolute" && (
+              <button
+                aria-label="Move freely"
+                title="Drag to position inside this container"
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  const handle = e.currentTarget;
+                  const el = handle.closest<HTMLElement>(".canvas-node")!;
+                  const startX = e.clientX,
+                    startY = e.clientY;
+                  const startLeft = el.offsetLeft,
+                    startTop = el.offsetTop;
+                  const move = (event: PointerEvent) => {
+                    el.style.left = `${startLeft + event.clientX - startX}px`;
+                    el.style.top = `${startTop + event.clientY - startY}px`;
+                  };
+                  const cleanup = () => {
+                    el.style.removeProperty("left");
+                    el.style.removeProperty("top");
+                    handle.removeEventListener("pointermove", move);
+                    handle.removeEventListener("pointerup", up);
+                    handle.removeEventListener("pointercancel", cancel);
+                  };
+                  const up = (event: PointerEvent) => {
+                    cleanup();
+                    reposition(
+                      Math.max(
+                        -4096,
+                        Math.min(
+                          4096,
+                          Math.round(
+                            (style.left ?? 0) + event.clientX - startX,
+                          ),
+                        ),
+                      ),
+                      Math.max(
+                        -4096,
+                        Math.min(
+                          4096,
+                          Math.round((style.top ?? 0) + event.clientY - startY),
+                        ),
+                      ),
+                    );
+                  };
+                  const cancel = () => cleanup();
+                  handle.setPointerCapture(e.pointerId);
+                  handle.addEventListener("pointermove", move);
+                  handle.addEventListener("pointerup", up);
+                  handle.addEventListener("pointercancel", cancel);
+                }}
+              >
+                ✥
+              </button>
+            )}
           </div>
           <button
             className="resize-handle"
@@ -250,6 +355,8 @@ export default function Editor({
   );
   const [creativeTab, setCreativeTab] = useState("looks");
   const [leftTab, setLeftTab] = useState("library");
+  const [placement, setPlacement] = useState<Placement>("inside");
+  const [renameRequest, setRenameRequest] = useState(0);
   const [rightTab, setRightTab] = useState("design");
   const [mobile, setMobile] = useState(false);
   const [history, setHistory] = useState<PageDocument[]>([]);
@@ -324,19 +431,21 @@ export default function Editor({
       ""
     );
   };
-  function insert(type: PageNode["type"], targetId?: string) {
+  function insert(
+    type: PageNode["type"],
+    targetId = selected,
+    where = placement,
+  ) {
     if (!doc) return;
     const newNode = primitive(type);
-    update((d) => {
-      const target = findNode(d, targetId ?? selected);
-      const dest =
-        target &&
-        ["container", "form", "collection", "conditional"].includes(target.type)
-          ? target
-          : findNode(d, parent()?.id ?? d.root.id)!;
-      dest.children.push(newNode);
-    });
-    setSelected(newNode.id);
+    newNode.name = uniqueName(doc, newNode.name);
+    try {
+      commit(insertAt(doc, newNode, targetId, where));
+      setSelected(newNode.id);
+    } catch (error) {
+      notify((error as Error).message);
+      return;
+    }
     if (type === "embed") {
       setCreativeTab("code");
       setCreativeOpen(true);
@@ -344,16 +453,49 @@ export default function Editor({
   }
   function insertComposition(newNode: PageNode) {
     if (!doc) return;
+    newNode.name = uniqueName(doc, newNode.name);
+    try {
+      commit(insertAt(doc, newNode, selected, placement));
+      setSelected(newNode.id);
+    } catch (error) {
+      notify((error as Error).message);
+    }
+  }
+  function duplicate() {
+    if (!doc || !node || selected === doc.root.id) return;
+    const copy = cloneNode(node);
+    copy.name = uniqueName(doc, node.name + " copy");
+    commit(insertAt(doc, copy, selected, "after"));
+    setSelected(copy.id);
+  }
+  function group() {
+    if (!doc || !node || selected === doc.root.id) return;
+    const folder = primitive("container");
+    folder.name = uniqueName(doc, en ? "Folder" : "Хавтас");
+    folder.style = {
+      display: "flex",
+      direction: "column",
+      gap: 0,
+      position: "relative",
+    };
+    commit(groupNode(doc, selected, folder));
+    setSelected(folder.id);
+  }
+  function remove() {
+    if (!doc || selected === doc.root.id) return;
+    const p = parent();
+    if (!p) return;
     update((d) => {
-      const target = findNode(d, selected);
-      const destination =
-        target &&
-        ["container", "form", "collection", "conditional"].includes(target.type)
-          ? target
-          : findNode(d, parent()?.id ?? d.root.id)!;
-      destination.children.push(newNode);
+      const dest = findNode(d, p.id)!;
+      dest.children = dest.children.filter((n) => n.id !== selected);
     });
-    setSelected(newNode.id);
+    setSelected(p.id);
+  }
+  function moveOut() {
+    if (!doc) return;
+    const p = parent();
+    if (p && p.id !== doc.root.id)
+      commit(moveRelative(doc, selected, p.id, "after"));
   }
   function undo() {
     if (!doc || !history.length) return;
@@ -428,13 +570,40 @@ export default function Editor({
       notify((e as Error).message);
     }
   }
-  const stateRef = useRef({ undo, redo, save, dirty });
-  stateRef.current = { undo, redo, save, dirty };
+  const stateRef = useRef({
+    undo,
+    redo,
+    save,
+    dirty,
+    duplicate,
+    group,
+    remove,
+  });
+  stateRef.current = { undo, redo, save, dirty, duplicate, group, remove };
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const editable = (e.target as HTMLElement).matches(
         "input,textarea,select,[contenteditable=true]",
       );
+      if (
+        !editable &&
+        (e.ctrlKey || e.metaKey) &&
+        ["d", "g"].includes(e.key.toLowerCase())
+      ) {
+        e.preventDefault();
+        e.key.toLowerCase() === "d"
+          ? stateRef.current.duplicate()
+          : stateRef.current.group();
+      }
+      if (!editable && e.key === "F2") {
+        e.preventDefault();
+        setLeftTab("layers");
+        setRenameRequest((value) => value + 1);
+      }
+      if (!editable && (e.key === "Delete" || e.key === "Backspace")) {
+        e.preventDefault();
+        stateRef.current.remove();
+      }
       if ((e.ctrlKey || e.metaKey) && e.key === "s") {
         e.preventDefault();
         void stateRef.current.save();
@@ -470,21 +639,15 @@ export default function Editor({
     if (!e.over || !doc) return;
     const target = e.over.data.current?.nodeId as string;
     if (!target) return;
+    const where: Placement = e.over.data.current?.placement ?? "inside";
     if (e.active.data.current?.type) {
-      insert(e.active.data.current.type, target);
+      insert(e.active.data.current.type, target, where);
       return;
     }
     const id = e.active.data.current?.nodeId as string;
-    if (id) {
+    if (id && id !== target) {
       try {
-        commit(
-          moveNode(
-            doc,
-            id,
-            target,
-            findNode(doc, target)?.children.length ?? 0,
-          ),
-        );
+        commit(moveRelative(doc, id, target, where));
         setSelected(id);
       } catch (error) {
         notify((error as Error).message);
@@ -501,24 +664,14 @@ export default function Editor({
       notify((e as Error).message);
     }
   }
-  const tree = (n: PageNode, depth = 0): ReactNode => (
-    <React.Fragment key={n.id}>
-      <button
-        className={`layer ${selected === n.id ? "active" : ""}`}
-        style={{ paddingLeft: 12 + depth * 13 }}
-        onClick={() => setSelected(n.id)}
-      >
-        <span>{icons[n.type]}</span>
-        <span>{n.name}</span>
-        {n.props.binding && <small>↗</small>}
-      </button>
-      {n.children.map((c) => tree(c, depth + 1))}
-    </React.Fragment>
-  );
+  useEffect(() => {
+    if (doc && !findNode(doc, selected)) setSelected(doc.root.id);
+    if (doc?.root.id === selected) setPlacement("inside");
+  }, [doc, selected]);
   if (!site || !doc) return <div className="loading">Студи нээгдэж байна…</div>;
   const style = mobile ? { ...node?.style, ...node?.mobile } : node?.style;
   return (
-    <div className="editor-shell">
+    <div className="editor-shell studio-workspace">
       {creativeOpen && node && (
         <Suspense
           fallback={
@@ -551,7 +704,13 @@ export default function Editor({
           ←
         </button>
         <div className="editor-site">
-          <strong>{site.business.name}</strong>
+          <span className="studio-mark" aria-hidden="true">
+            ▰
+          </span>
+          <strong>
+            {site.business.name}
+            <small>URU / WEBSITE STUDIO</small>
+          </strong>
           <span>
             Нүүр хуудас <b>⌄</b>
           </span>
@@ -644,6 +803,112 @@ export default function Editor({
         }}
         onDragEnd={dragEnd}
       >
+        <div className="studio-ribbon" aria-label="Workspace tools">
+          <div className="ribbon-group ribbon-palette">
+            <span className="ribbon-label">{en ? "INSERT" : "НЭМЭХ"}</span>
+            <div className="ribbon-tools">
+              {primitives.map((type) => (
+                <LibraryItem
+                  key={type}
+                  compact
+                  type={type}
+                  insert={() => insert(type)}
+                />
+              ))}
+            </div>
+          </div>
+          <div className="ribbon-group">
+            <label className="ribbon-label" htmlFor="insert-placement">
+              {en ? "PLACE NEW ELEMENT" : "ШИНЭ ЭЛЕМЕНТИЙН БАЙРЛАЛ"}
+            </label>
+            <select
+              id="insert-placement"
+              aria-label="Insert placement"
+              value={placement}
+              onChange={(e) => setPlacement(e.target.value as Placement)}
+            >
+              <option value="before" disabled={selected === doc.root.id}>
+                ↑ Above / Дээр
+              </option>
+              <option value="inside">↳ Inside / Дотор</option>
+              <option value="after" disabled={selected === doc.root.id}>
+                ↓ Below / Доор
+              </option>
+            </select>
+          </div>
+          <div className="ribbon-group">
+            <span className="ribbon-label">{en ? "ORGANIZE" : "ЦЭГЦЛЭХ"}</span>
+            <div className="ribbon-tools">
+              <button
+                className="ribbon-command"
+                aria-label="Group in folder"
+                title="Ctrl / ⌘ G"
+                disabled={selected === doc.root.id}
+                onClick={group}
+              >
+                <span>▰＋</span>
+                <small>Folder</small>
+              </button>
+              <button
+                className="ribbon-command"
+                aria-label="Rename element"
+                title="F2"
+                onClick={() => {
+                  setLeftTab("layers");
+                  setRenameRequest((value) => value + 1);
+                }}
+              >
+                <span>Ab</span>
+                <small>Rename</small>
+              </button>
+              <button
+                className="ribbon-command"
+                aria-label="Duplicate element"
+                title="Ctrl / ⌘ D"
+                disabled={selected === doc.root.id}
+                onClick={duplicate}
+              >
+                <span>⧉</span>
+                <small>Duplicate</small>
+              </button>
+            </div>
+          </div>
+          <div className="ribbon-group ribbon-arrange">
+            <span className="ribbon-label">{en ? "ARRANGE" : "ДАРААЛАЛ"}</span>
+            <div className="ribbon-tools">
+              <button
+                aria-label="Move up"
+                disabled={!parent() || parent()!.children[0]?.id === selected}
+                onClick={() => shift(-1)}
+              >
+                ↑
+              </button>
+              <button
+                aria-label="Move down"
+                disabled={
+                  !parent() || parent()!.children.at(-1)?.id === selected
+                }
+                onClick={() => shift(1)}
+              >
+                ↓
+              </button>
+              <button
+                aria-label="Move out of folder"
+                disabled={!parent() || parent()?.id === doc.root.id}
+                onClick={moveOut}
+              >
+                ↰
+              </button>
+              <button
+                aria-label="Delete element"
+                disabled={selected === doc.root.id}
+                onClick={remove}
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        </div>
         <div className="editor-body">
           <aside className="editor-library">
             <div className="panel-tabs">
@@ -651,13 +916,14 @@ export default function Editor({
                 className={leftTab === "library" ? "active" : ""}
                 onClick={() => setLeftTab("library")}
               >
-                Элемент
+                {en ? "Toolbox" : "Элемент"}
               </button>
               <button
+                aria-label="Давхарга"
                 className={leftTab === "layers" ? "active" : ""}
                 onClick={() => setLeftTab("layers")}
               >
-                Давхарга
+                Explorer
               </button>
             </div>
             {leftTab === "library" ? (
@@ -712,19 +978,7 @@ export default function Editor({
                       className="composition"
                       onClick={() => {
                         const copy = cloneNode(c);
-                        update((d) => {
-                          const n = findNode(d, selected)!;
-                          ([
-                            "container",
-                            "form",
-                            "collection",
-                            "conditional",
-                          ].includes(n.type)
-                            ? n
-                            : d.root
-                          ).children.push(copy);
-                        });
-                        setSelected(copy.id);
+                        insertComposition(copy);
                       }}
                     >
                       {icons[c.type]} {c.name} ＋
@@ -732,24 +986,39 @@ export default function Editor({
                   ))}
                 </div>
               </>
-            ) : (
-              <div className="layers">
-                {tree(doc.root)}
-                <div className="layer-controls">
-                  <button onClick={() => shift(-1)}>↑ Дээш</button>
-                  <button onClick={() => shift(1)}>↓ Доош</button>
-                </div>
-              </div>
-            )}
+            ) : null}
+            <Explorer
+              doc={doc}
+              selected={selected}
+              select={setSelected}
+              rename={(id, value) =>
+                update((d) => {
+                  findNode(d, id)!.name = value;
+                })
+              }
+              icons={icons}
+              en={en}
+              renameRequest={renameRequest}
+            />
             <div className="editor-bottom-note">
               Өөрчлөлт бизнесийн мэдээлэлд нөлөөлөхгүй.
             </div>
           </aside>
           <main className="canvas-workspace">
             <div className="canvas-breadcrumb">
-              <span>Вебсайт</span>
-              <span>/</span>
-              <strong>{doc.title}</strong>
+              <span className="viewport-tab">
+                ▧ {en ? "Viewport" : "Хуудас"}
+              </span>
+              <div className="workspace-breadcrumb">
+                {nodePath(doc, selected).map((part, i) => (
+                  <React.Fragment key={part.id}>
+                    {i > 0 && <span>/</span>}
+                    <button onClick={() => setSelected(part.id)}>
+                      {part.name}
+                    </button>
+                  </React.Fragment>
+                ))}
+              </div>
               <span className="canvas-size">
                 {mobile ? "360 px · Утас" : "Desktop · Уян байрлал"}
               </span>
@@ -790,6 +1059,17 @@ export default function Editor({
                         selected={selected === n.id}
                         select={() => setSelected(n.id)}
                         scope={record?.id}
+                        root={n.id === doc.root.id}
+                        mobilePreview={mobile}
+                        style={mobile ? { ...n.style, ...n.mobile } : n.style}
+                        reposition={(left, top) => {
+                          setSelected(n.id);
+                          update((d) => {
+                            const el = findNode(d, n.id)!;
+                            if (mobile) el.mobile = { ...el.mobile, left, top };
+                            else Object.assign(el.style, { left, top });
+                          });
+                        }}
                         resize={(width) => {
                           setSelected(n.id);
                           update((d) => {
@@ -814,14 +1094,14 @@ export default function Editor({
               <span>⠿ Чирж байрлуулах</span>
               <span>⌘ Z Буцаах</span>
               <span>⌘ S Хадгалах</span>
-              <span>Текст дээр дарж засах</span>
+              <span>F2 Нэрлэх · ⌘ G Хавтас · ⌘ D Хуулбар</span>
             </div>
           </main>
           <aside className="inspector">
             <div className="inspector-title">
               <span>{node ? icons[node.type] : "▣"}</span>
               <div>
-                <small>СОНГОСОН ЭЛЕМЕНТ</small>
+                <small>PROPERTIES / ШИНЖ ЧАНАР</small>
                 <strong>{node?.name}</strong>
               </div>
             </div>
@@ -846,6 +1126,7 @@ export default function Editor({
                   Элементийн нэр
                   <input
                     value={node.name}
+                    maxLength={100}
                     onChange={(e) =>
                       update((d) => {
                         findNode(d, selected)!.name = e.target.value;
@@ -870,8 +1151,149 @@ export default function Editor({
                 </button>
                 {rightTab === "design" ? (
                   <>
+                    <div className="position-panel">
+                      <div className="inspector-section-title">
+                        {en ? "POSITION" : "БАЙРЛАЛ"}
+                        <span>{mobile ? "Mobile" : "Desktop"}</span>
+                      </div>
+                      <div className="position-modes">
+                        <button
+                          className={
+                            style?.position !== "absolute" ? "active" : ""
+                          }
+                          aria-pressed={style?.position !== "absolute"}
+                          onClick={() =>
+                            setStyle({
+                              position: "relative",
+                              anchor: "top-left",
+                              left: 0,
+                              top: 0,
+                            })
+                          }
+                        >
+                          ☷ {en ? "Flow" : "Дараалал"}
+                        </button>
+                        <button
+                          className={
+                            style?.position === "absolute" ? "active" : ""
+                          }
+                          aria-pressed={style?.position === "absolute"}
+                          aria-label="Free position"
+                          disabled={node.id === doc.root.id}
+                          onClick={() =>
+                            setStyle({
+                              position: "absolute",
+                              anchor: "top-left",
+                              top: 24,
+                              left: 24,
+                              width:
+                                style?.width === "100%" || !style?.width
+                                  ? "180px"
+                                  : style.width,
+                            })
+                          }
+                        >
+                          ✥ {en ? "Free" : "Чөлөөтэй"}
+                        </button>
+                      </div>
+                      {style?.position === "absolute" ? (
+                        <>
+                          <div className="anchor-controls">
+                            <div
+                              className="anchor-grid"
+                              aria-label="Position anchor"
+                            >
+                              {[
+                                "top-left",
+                                "top-center",
+                                "top-right",
+                                "center-left",
+                                "center",
+                                "center-right",
+                                "bottom-left",
+                                "bottom-center",
+                                "bottom-right",
+                              ].map((anchor) => (
+                                <button
+                                  key={anchor}
+                                  aria-label={`Anchor ${anchor}`}
+                                  aria-pressed={
+                                    (style.anchor ?? "top-left") === anchor
+                                  }
+                                  className={
+                                    (style.anchor ?? "top-left") === anchor
+                                      ? "active"
+                                      : ""
+                                  }
+                                  onClick={() =>
+                                    setStyle({
+                                      anchor: anchor as Styles["anchor"],
+                                      left: 0,
+                                      top: 0,
+                                    })
+                                  }
+                                >
+                                  ·
+                                </button>
+                              ))}
+                            </div>
+                            <p>
+                              {en
+                                ? "Anchor to the parent. Drag ✥ on the canvas to move."
+                                : "Хавтас дотор байрлана. ✥ бариулаас чирж зөөнө."}
+                            </p>
+                          </div>
+                          <div className="field-pair">
+                            {(["left", "top"] as const).map((key, i) => (
+                              <label key={key}>
+                                {i ? "Y / Босоо" : "X / Хэвтээ"}
+                                <input
+                                  aria-label={i ? "Position Y" : "Position X"}
+                                  type="number"
+                                  min={-4096}
+                                  max={4096}
+                                  value={style[key] ?? 0}
+                                  onChange={(e) =>
+                                    setStyle({
+                                      [key]: Math.max(
+                                        -4096,
+                                        Math.min(4096, Number(e.target.value)),
+                                      ),
+                                    })
+                                  }
+                                />
+                              </label>
+                            ))}
+                          </div>
+                          <label>
+                            {en ? "Layer order" : "Давхаргын дараалал"}
+                            <input
+                              aria-label="Layer order"
+                              type="number"
+                              min={0}
+                              max={10}
+                              value={style.zIndex ?? 0}
+                              onChange={(e) =>
+                                setStyle({
+                                  zIndex: Math.max(
+                                    0,
+                                    Math.min(10, Number(e.target.value)),
+                                  ),
+                                })
+                              }
+                            />
+                          </label>
+                        </>
+                      ) : (
+                        <p className="position-tip">
+                          {en
+                            ? "Use ↑ ↓ to reorder. Drop into a folder to nest."
+                            : "↑ ↓ товчоор эрэмбэл. Хавтас руу чирж дотор нь байрлуул."}
+                        </p>
+                      )}
+                    </div>
                     <div className="inspector-section-title">
-                      БАЙРЛАЛ{" "}
+                      ЗОХИОН БАЙГУУЛАЛТ{" "}
                       <span>{mobile ? "Утасны тохиргоо" : "Үндсэн"}</span>
                     </div>
                     <div className="field-pair">
@@ -1084,41 +1506,6 @@ export default function Editor({
                         ))}
                       </select>
                     </label>
-                    <details>
-                      <summary>Давхарлах тохиргоо</summary>
-                      <p className="muted">
-                        Absolute нь зөвхөн байрлалтай контейнерт чимэглэлийн
-                        зориулалттай. Үндсэн агуулгыг flow-д байлга.
-                      </p>
-                      <label>
-                        Position
-                        <select
-                          value={style?.position ?? "relative"}
-                          onChange={(e) =>
-                            setStyle({
-                              position: e.target.value as Styles["position"],
-                            })
-                          }
-                        >
-                          <option>relative</option>
-                          <option>absolute</option>
-                        </select>
-                      </label>
-                      <div className="field-pair">
-                        {(["top", "left", "zIndex"] as const).map((k) => (
-                          <label key={k}>
-                            {k}
-                            <input
-                              type="number"
-                              value={style?.[k] ?? 0}
-                              onChange={(e) =>
-                                setStyle({ [k]: Number(e.target.value) })
-                              }
-                            />
-                          </label>
-                        ))}
-                      </div>
-                    </details>
                     <p className="muted">
                       Хэт өргөн элемент байвал min/max width болон утасны
                       тохиргоог шалгаарай.
@@ -1756,18 +2143,7 @@ export default function Editor({
                         ↓ Доош
                       </button>
                     </div>
-                    <button
-                      className="subtle full"
-                      onClick={() => {
-                        const copy = cloneNode(node);
-                        update((d) => {
-                          findNode(d, parent()?.id ?? d.root.id)!.children.push(
-                            copy,
-                          );
-                        });
-                        setSelected(copy.id);
-                      }}
-                    >
+                    <button className="subtle full" onClick={duplicate}>
                       ⧉ Хуулбарлах
                     </button>
                     <button
@@ -1791,19 +2167,7 @@ export default function Editor({
                     >
                       ▧ Дахин ашиглах бүтэц
                     </button>
-                    <button
-                      className="text-danger full"
-                      onClick={() => {
-                        const p = parent();
-                        update((d) => {
-                          const el = findNode(d, p?.id ?? d.root.id)!;
-                          el.children = el.children.filter(
-                            (n) => n.id !== selected,
-                          );
-                        });
-                        setSelected(p?.id ?? doc.root.id);
-                      }}
-                    >
+                    <button className="text-danger full" onClick={remove}>
                       Элемент устгах
                     </button>
                   </>

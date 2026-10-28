@@ -18,7 +18,8 @@
     "format:check": "prettier --check src server tests docs *.json *.html *.ts README.md",
     "build:pages": "tsc --noEmit && vite build --mode pages --outDir dist-pages",
     "test:pages": "tsx tests/pages-browser.ts",
-    "test:creative": "tsx tests/creative-browser.ts"
+    "test:creative": "tsx tests/creative-browser.ts",
+    "test:workspace": "tsx tests/workspace-browser.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

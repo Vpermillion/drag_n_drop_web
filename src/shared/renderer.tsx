@@ -4,6 +4,7 @@ import {
   parseScopedCSS,
   appearanceGradients,
   appearanceShadows,
+  geometryDeclarations,
 } from "./creative";
 import { apiFetch } from "../transport";
 import { assetUrl, localHref, isPages } from "../paths";
@@ -25,10 +26,36 @@ export function cssStyle(s: Styles): CSSProperties {
     borderWidth,
     borderColor,
     radius,
+    anchor,
+    top,
+    left,
     ...rest
   } = s;
+  const anchors = [
+    "top-left",
+    "top-center",
+    "top-right",
+    "center-left",
+    "center",
+    "center-right",
+    "bottom-left",
+    "bottom-center",
+    "bottom-right",
+  ];
+  const anchorIndex =
+    s.position === "absolute" && anchor ? anchors.indexOf(anchor) : -1;
+  const x = anchorIndex % 3,
+    y = Math.floor(anchorIndex / 3);
   return {
     ...rest,
+    top: anchorIndex < 0 ? top : `calc(${y * 50}% + ${top ?? 0}px)`,
+    left: anchorIndex < 0 ? left : `calc(${x * 50}% + ${left ?? 0}px)`,
+    translate:
+      anchorIndex < 0
+        ? s.position === "relative"
+          ? "none"
+          : undefined
+        : `${x * -50}% ${y * -50}%`,
     flexDirection: direction,
     flexWrap: wrap === undefined ? undefined : wrap ? "wrap" : "nowrap",
     gridTemplateColumns: columns
@@ -54,7 +81,7 @@ function declarations(s: Styles) {
     )
     .join(";");
 }
-export function pageCSS(site: SiteData) {
+export function pageCSS(site: SiteData, editing = false) {
   let css = "";
   walk(site.document.root, (n) => {
     const appearance = n.props.appearance;
@@ -78,8 +105,53 @@ export function pageCSS(site: SiteData) {
       ...(n.style.fontSize && n.style.fontSize > 44 ? { fontSize: 40 } : {}),
       ...(n.style.padding && n.style.padding > 28 ? { padding: 22 } : {}),
     };
-    const responsive = `.pn-${n.id}{${declarations({ ...fallback, ...n.mobile })}}`;
+    const responsiveStyle: Styles = { ...fallback, ...n.mobile };
+    const effective = { ...n.style, ...n.mobile };
+    if (effective.position === "absolute" || n.mobile?.position) {
+      Object.assign(responsiveStyle, {
+        position: effective.position,
+        anchor: effective.anchor,
+        top: effective.top ?? 0,
+        left: effective.left ?? 0,
+      });
+    }
+    const responsive = `.pn-${n.id}{${declarations(responsiveStyle)}}`;
     css += `@media(max-width:600px){${responsive}}@container site (max-width:600px){${responsive}}`;
+    if (editing) {
+      // Layout belongs to the selectable wrapper in the editor. The same layout
+      // belongs directly to the primitive in the published document.
+      const layout = (style: Styles) => {
+        const computed = cssStyle(style);
+        const geometry = Object.fromEntries(
+          [
+            "width",
+            "minWidth",
+            "maxWidth",
+            "height",
+            "minHeight",
+            "position",
+            "top",
+            "left",
+            "zIndex",
+            "translate",
+          ].map((key) => [key, computed[key as keyof CSSProperties]]),
+        );
+        return Object.entries(geometry)
+          .filter(([, value]) => value !== undefined)
+          .map(
+            ([key, value]) =>
+              `${kebab(key)}:${typeof value === "number" && key !== "zIndex" ? value + "px" : value}`,
+          )
+          .join(";");
+      };
+      const selector = `.editing-site .canvas-node[data-node-id="${n.id}"]`;
+      css += `${selector}{${layout(n.style)}}`;
+      css += `${selector}>.node-content>.pn-${n.id}{translate:none}`;
+      if (!custom.errors.length && custom.css)
+        css += `${selector}{${geometryDeclarations(custom.css)}}`;
+      const mobileLayout = `${selector}{${layout({ ...n.style, ...n.mobile })}}`;
+      css += `@media(max-width:600px){${mobileLayout}}@container site (max-width:600px){${mobileLayout}}`;
+    }
   });
   return css;
 }
@@ -477,7 +549,7 @@ export function PageRenderer({
     <div
       className={`published-site theme-${site.theme} ${editing ? "editing-site" : ""}`}
     >
-      <style>{pageCSS(site)}</style>
+      <style>{pageCSS(site, editing)}</style>
       {!editing && (
         <div className="test-banner">
           {isPages

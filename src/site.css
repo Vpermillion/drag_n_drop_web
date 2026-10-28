@@ -56,6 +56,18 @@ p {
   min-width: 0;
   max-width: 100%;
 }
+.published-site
+  :where(.node-container, .node-form, .node-conditional, .record-scope) {
+  position: relative;
+}
+.editing-site .canvas-node > .node-content > .page-node {
+  position: relative !important;
+  top: auto !important;
+  left: auto !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
 .published-site h1,
 .published-site h2,
 .published-site h3 {

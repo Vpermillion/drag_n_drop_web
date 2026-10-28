@@ -45,8 +45,21 @@ export const styleSchema = z
     radius: z.number().min(0).max(400).optional(),
     objectFit: z.enum(["cover", "contain"]).optional(),
     position: z.enum(["relative", "absolute"]).optional(),
-    top: z.number().min(-200).max(200).optional(),
-    left: z.number().min(-200).max(200).optional(),
+    anchor: z
+      .enum([
+        "top-left",
+        "top-center",
+        "top-right",
+        "center-left",
+        "center",
+        "center-right",
+        "bottom-left",
+        "bottom-center",
+        "bottom-right",
+      ])
+      .optional(),
+    top: z.number().min(-4096).max(4096).optional(),
+    left: z.number().min(-4096).max(4096).optional(),
     zIndex: z.number().int().min(0).max(10).optional(),
     opacity: z.number().min(0).max(1).optional(),
   })

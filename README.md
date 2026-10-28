@@ -36,6 +36,10 @@ npm start
 
 Production mode serves the built frontend and server-rendered published pages. It is still a **single-host Node pilot**, not a deployed SaaS or Cloudflare Worker. Use persistent storage and HTTPS before hosting it. Production cookies default to `Secure`; `COOKIE_SECURE=false` is only for local HTTP testing.
 
+## Workspace Studio
+
+The builder has a Roblox Studio-inspired toolbar, folder Explorer and properties panel. Insert elements above, inside or below a selection; rename, group, reorder and nest them. Free-position mode adds nine anchors, X/Y controls and a drag handle with independent mobile overrides. See [Workspace Studio](docs/WORKSPACE_STUDIO.md).
+
 ## Creative Studio
 
 Select an element, then open **✳ Бүтээлч студи / Creative studio** for four visual looks, four editable starting compositions, gradients/shadows, motion/hover effects, compiled Tailwind utilities and scoped CSS. The HTML / JS tab previews and inserts an isolated interactive widget; code cannot access parent business data or checkout. See [Creative Studio](docs/CREATIVE_STUDIO.md) for supported CSS/Tailwind capabilities and the sandbox boundary.
@@ -55,6 +59,7 @@ npm test
 npm run build
 npm run test:browser
 npm run test:creative
+npm run test:workspace
 ```
 
 Browser tests require Chromium (`/usr/bin/chromium` by default; set `CHROMIUM_PATH` for a different installation). The test starts/stops its own production server with a temporary SQLite database and uses real UI actions. Screenshots go to ignored `artifacts/`. It does not modify your development database or connect to external providers.

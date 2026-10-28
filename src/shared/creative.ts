@@ -37,6 +37,33 @@ export function utilityClasses(input = "", mobilePreview = false) {
     .map((t) => "tw:" + t)
     .join(" ");
 }
+export function geometryUtilityClasses(input = "", mobilePreview = false) {
+  return utilityClasses(
+    input
+      .split(/\s+/)
+      .filter((token) =>
+        /^(?:min-|max-)?[wh]-/.test(token.split(":").at(-1) ?? ""),
+      )
+      .join(" "),
+    mobilePreview,
+  );
+}
+export function geometryDeclarations(css: string) {
+  const ast = parse(css, {
+    context: "declarationList",
+    parseCustomProperty: true,
+  });
+  const declarations: string[] = [];
+  walk(ast, (node) => {
+    if (
+      node.type === "Declaration" &&
+      (/^(?:min-|max-)?(?:width|height)$/.test(node.property) ||
+        node.property.startsWith("--"))
+    )
+      declarations.push(generate(node));
+  });
+  return declarations.join(";");
+}
 const properties = new Set(
   `background background-color background-image background-position background-size background-repeat background-blend-mode color opacity border border-width border-style border-color border-radius border-top border-bottom border-left border-right box-shadow outline outline-color outline-width outline-offset outline-style padding padding-top padding-right padding-bottom padding-left padding-inline padding-block margin margin-top margin-right margin-bottom margin-left margin-inline margin-block width min-width max-width height min-height max-height aspect-ratio display flex flex-direction flex-wrap flex-grow flex-shrink flex-basis gap row-gap column-gap align-items align-self align-content justify-content justify-items justify-self order grid grid-template-columns grid-template-rows grid-auto-flow grid-auto-columns grid-auto-rows grid-column grid-row place-items place-content font-family font-size font-style font-weight font-variant line-height letter-spacing word-spacing text-align text-decoration text-transform text-shadow text-wrap text-overflow white-space overflow-wrap word-break list-style-type object-fit object-position transform transform-origin transition transition-property transition-duration transition-timing-function filter backdrop-filter clip-path isolation`.split(
     " ",
